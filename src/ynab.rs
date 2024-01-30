@@ -1,6 +1,7 @@
 use reqwest;
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
+use chrono_tz::Europe::Oslo;
 use crate::{config::Config, sparebanken1};
 
 const BASE_API_URL: &str = "https://api.ynab.com/v1";
@@ -35,7 +36,8 @@ pub struct CreateYnabTransactionResponseData {
 
 fn parse_transactions(transactions: Vec<sparebanken1::Transaction>, account_config: &HashMap<String, String>) -> Vec<CreateYnabTransaction> {
     transactions.iter().scan(Vec::new(), |state, t| {
-        let formated_date = t.date.format("%Y-%m-%d").to_string();
+        let oslo_time = t.date.with_timezone(&Oslo);
+        let formated_date = oslo_time.format("%Y-%m-%d").to_string();
         let account_id = account_config.get(&t.account).unwrap();
 
         // Check if same transactions has been imported before
