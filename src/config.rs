@@ -1,3 +1,5 @@
+use std::env;
+
 #[derive(Debug)]
 pub struct Config {
     pub sparebank1_client_id: String,
@@ -11,7 +13,10 @@ pub struct Config {
 
 impl Config {
     pub fn new() -> Result<Self, dotenvy::Error> {
-        dotenvy::dotenv()?;
+        if let Err(_) = dotenvy::dotenv() {
+            println!("No .env file found, loading environment variables from system");
+        }
+
         if let (
             Ok(sparebank1_client_id),
             Ok(sparebank1_client_secret),
@@ -21,13 +26,13 @@ impl Config {
             Ok(refresh_token_file_path),
             Ok(initial_refresh_token),
         ) = (
-            dotenvy::var("SPAREBANK1_CLIENT_ID"),
-            dotenvy::var("SPAREBANK1_CLIENT_SECRET"),
-            dotenvy::var("YNAB_ACCESS_TOKEN"),
-            dotenvy::var("YNAB_BUDGET_ID"),
-            dotenvy::var("ACCOUNT_CONFIG_PATH"),
-            dotenvy::var("REFRESH_TOKEN_FILE_PATH"),
-            dotenvy::var("INITIAL_REFRESH_TOKEN"),
+            env::var("SPAREBANK1_CLIENT_ID"),
+            env::var("SPAREBANK1_CLIENT_SECRET"),
+            env::var("YNAB_ACCESS_TOKEN"),
+            env::var("YNAB_BUDGET_ID"),
+            env::var("ACCOUNT_CONFIG_PATH"),
+            env::var("REFRESH_TOKEN_FILE_PATH"),
+            env::var("INITIAL_REFRESH_TOKEN"),
         ) {
             Ok(Self {
                 sparebank1_client_id,

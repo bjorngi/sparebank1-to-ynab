@@ -12,9 +12,9 @@ struct TransactionsResponse {
 struct TransactionResponse {
     id: String,
     amount: f32, 
-    description: String,
+    description: Option<String>,
     #[serde(rename = "cleanedDescription")]
-    cleaned_description: String,
+    cleaned_description: Option<String>,
     #[serde(rename = "accountKey")]
     account_key: String,
     date: i64,
@@ -37,8 +37,8 @@ fn parse_transaction(transaction: &TransactionResponse) -> Transaction {
     Transaction {
         id: transaction.id.clone(),
         account: transaction.account_key.clone(),
-        description: transaction.description.clone(),
-        payee: transaction.cleaned_description.clone(),
+        description: transaction.description.clone().unwrap_or("".to_string()),
+        payee: transaction.cleaned_description.clone().unwrap_or("".to_string()),
         amount: transaction.amount,
         date: transaction_date,
     }
