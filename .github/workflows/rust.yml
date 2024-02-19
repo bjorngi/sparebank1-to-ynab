@@ -1,20 +1,40 @@
-name: Rust
+name: Rust Build and Release
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
   pull_request:
-    branches: [ "main" ]
-
-env:
-  CARGO_TERM_COLOR: always
+    branches:
+      - main
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Build
-      run: cargo build --release
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+
+      - name: Build release
+        run: cargo build --release
+        env:
+          CARGO_TERM_COLOR: always
+
+      - name: Archive release
+        uses: actions/upload-artifact@v2
+        with:
+          name: release
+          path: target/release/sparebank1-to-ynab-setup
+
+      - name: Archive release
+        uses: actions/upload-artifact@v2
+        with:
+          name: release
+          path: target/release/sparebank1-to-ynab-sync

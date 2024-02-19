@@ -15,7 +15,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let account_config = account_config::read_accounts_json(&config.account_config_path)?;
     let accounts = account_config.keys().cloned().collect();
 
-    let transactions = sparebanken1::get_transactions(access_token, accounts).await?;
+    let transactions = sparebanken1::get_transactions(&access_token, accounts).await?;
     let ynab_response = ynab::add_transactions(&config, account_config, transactions).await?;
 
     let now = chrono::offset::Local::now();
