@@ -33,6 +33,10 @@ jobs:
         with:
           targets: semantic-release-cargo@2
 
+      - name: Any Name Bash Test Step
+        shell: bash
+        run: |
+          echo "Output from job 1: ${{ needs.get-next-version.outputs }}"
 
       - name: Prepare semantic-release for Rust
         if: needs.get-next-version.outputs.new-release-published == 'true'
