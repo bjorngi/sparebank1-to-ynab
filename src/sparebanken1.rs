@@ -118,11 +118,12 @@ fn parse_account(account: &AccountResponse) -> Account {
 }
 
 pub async fn get_accounts(access_token: &String) -> Result<Vec<Account>, reqwest::Error> {
-    let url = format!("{}/accounts", BASE_API_URL);
+    let url = format!("{}/accounts?includeCreditCardAccounts=true", BASE_API_URL);
 
     let accounts_response = reqwest::Client::new()
         .get(&url)
         .header("Authorization", &format!("Bearer {}", access_token))
+        .header("accept", "application/vnd.sparebank1.v1+json")
         .send()
         .await?
         .error_for_status()

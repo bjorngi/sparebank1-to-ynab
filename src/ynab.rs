@@ -1,4 +1,4 @@
-use crate::{config::Config, sparebanken1};
+use crate::sparebanken1;
 use chrono_tz::Europe::Oslo;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -66,14 +66,12 @@ fn parse_transactions(
 }
 
 pub async fn add_transactions(
-    config: &Config,
+    ynab_access_token: &str,
+    ynab_budget_id: &str,
     account_config: HashMap<String, String>,
     transactions: Vec<sparebanken1::Transaction>,
 ) -> Result<CreateYnabTransactionResponseData, reqwest::Error> {
-    let url: &str = &format!(
-        "{}/budgets/{}/transactions",
-        BASE_API_URL, config.ynab_budget_id
-    );
+    let url: &str = &format!("{}/budgets/{}/transactions", BASE_API_URL, ynab_budget_id);
     let ynab_transactions: Vec<CreateYnabTransaction> =
         parse_transactions(transactions, &account_config);
 
@@ -84,10 +82,7 @@ pub async fn add_transactions(
     let client = reqwest::Client::new();
     let response = client
         .post(url)
-        .header(
-            "Authorization",
-            &format!("Bearer {}", config.ynab_access_token),
-        )
+        .header("Authorization", &format!("Bearer {}", ynab_access_token))
         .json(&data)
         .send()
         .await?
@@ -113,15 +108,15 @@ struct YnabAccountsResponse {
     data: YnabAccountResponse,
 }
 
-pub async fn get_accounts(config: &Config) -> Result<Vec<Account>, reqwest::Error> {
-    let url = format!("{BASE_API_URL}/budgets/{}/accounts", config.ynab_budget_id);
+pub async fn get_accounts(
+    ynab_access_token: &str,
+    ynab_budget_id: &str,
+) -> Result<Vec<Account>, reqwest::Error> {
+    let url = format!("{BASE_API_URL}/budgets/{}/accounts", ynab_budget_id);
 
     let response = reqwest::Client::new()
         .get(url)
-        .header(
-            "Authorization",
-            &format!("Bearer {}", config.ynab_access_token),
-        )
+        .header("Authorization", &format!("Bearer {}", ynab_access_token))
         .send()
         .await?
         .json::<YnabAccountsResponse>()
@@ -136,7 +131,6 @@ pub async fn get_accounts(config: &Config) -> Result<Vec<Account>, reqwest::Erro
         .collect();
 
     Ok(filteredAccounts)
-    // Ok(response.data.accounts)
 }
 
 #[derive(Debug, Deserialize)]
@@ -154,14 +148,11 @@ struct YnabBudgetsResponse {
 struct YnabBudgetsDataResponse {
     data: YnabBudgetsResponse,
 }
-pub async fn get_budgets(config: &Config) -> Result<Vec<Budget>, reqwest::Error> {
+pub async fn get_budgets(ynab_access_token: &str) -> Result<Vec<Budget>, reqwest::Error> {
     let url = format!("{BASE_API_URL}/budgets/");
     let response = reqwest::Client::new()
         .get(url)
-        .header(
-            "Authorization",
-            &format!("Bearer {}", config.ynab_access_token),
-        )
+        .header("Authorization", &format!("Bearer {}", ynab_access_token))
         .send()
         .await?
         .json::<YnabBudgetsDataResponse>()

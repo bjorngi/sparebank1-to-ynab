@@ -4,6 +4,7 @@ use std::env;
 pub struct Config {
     pub sparebank1_client_id: String,
     pub sparebank1_client_secret: String,
+    pub sparebank1_fin_inst: String,
     pub ynab_access_token: String,
     pub ynab_budget_id: String,
     pub account_config_path: String,
@@ -20,6 +21,7 @@ impl Config {
         if let (
             Ok(sparebank1_client_id),
             Ok(sparebank1_client_secret),
+            Ok(sparebank1_fin_inst),
             Ok(ynab_access_token),
             Ok(ynab_budget_id),
             Ok(account_config_path),
@@ -28,6 +30,7 @@ impl Config {
         ) = (
             env::var("SPAREBANK1_CLIENT_ID"),
             env::var("SPAREBANK1_CLIENT_SECRET"),
+            env::var("SPAREBANK1_FIN_INST"),
             env::var("YNAB_ACCESS_TOKEN"),
             env::var("YNAB_BUDGET_ID"),
             env::var("ACCOUNT_CONFIG_PATH"),
@@ -37,6 +40,7 @@ impl Config {
             Ok(Self {
                 sparebank1_client_id,
                 sparebank1_client_secret,
+                sparebank1_fin_inst,
                 ynab_access_token,
                 ynab_budget_id,
                 account_config_path,
