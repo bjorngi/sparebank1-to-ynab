@@ -81,40 +81,17 @@ pub async fn get_transactions(
 }
 
 #[derive(Debug, Deserialize)]
-struct AccountMetadataResponse {
-    accountKey: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct AccountResponse {
-    #[serde(rename = "accountName")]
-    account_name: String,
-    #[serde(rename = "accountNumber")]
-    account_number: String,
-    balance: String,
-    metadata: AccountMetadataResponse,
-}
-
-#[derive(Debug, Deserialize)]
 struct AccountsResponse {
-    accounts: Vec<AccountResponse>,
+    accounts: Vec<Account>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub struct Account {
     pub name: String,
     pub balance: f32,
     pub key: String,
+    #[serde(rename = "accountNumber")]
     pub account_number: String,
-}
-
-fn parse_account(account: &AccountResponse) -> Account {
-    Account {
-        name: account.account_name.clone(),
-        balance: account.balance.parse::<f32>().unwrap(),
-        key: account.metadata.accountKey.clone(),
-        account_number: account.account_number.clone(),
-    }
 }
 
 pub async fn get_accounts(access_token: &String) -> Result<Vec<Account>, reqwest::Error> {
@@ -131,10 +108,12 @@ pub async fn get_accounts(access_token: &String) -> Result<Vec<Account>, reqwest
             eprintln!("Request error: {}", e);
             e
         })?
-        .json::<Vec<AccountResponse>>()
+        .text()
         .await?;
 
-    let accounts: Vec<Account> = accounts_response.iter().map(parse_account).collect();
+    let accounts_json: AccountsResponse =
+        serde_json::from_str(&accounts_response).expect("Some error");
 
-    Ok(accounts)
+    let acconts = accounts_json.accounts;
+    Ok(acconts)
 }

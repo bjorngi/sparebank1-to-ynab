@@ -39,8 +39,6 @@ async fn get_access_token(
         .json::<serde_json::Value>()
         .await?;
 
-    println!("Response: {:#?}", response);
-
     let access_token = response["access_token"].as_str().unwrap().to_string();
     let refresh_token = response["refresh_token"].as_str().unwrap().to_string();
 
@@ -108,6 +106,9 @@ fn select_budget(ynab_budgets: &[ynab::Budget]) -> &ynab::Budget {
             .expect("Failed to read line");
 
         let choice: usize = input.trim().parse().expect("Must be a number");
+
+        println!("YNAB Budgets: {:?}", ynab_budgets);
+        println!("Choice: {}", choice);
         return ynab_budgets.get(choice - 1).expect("Do it");
     }
 }
@@ -163,7 +164,7 @@ fn write_config_file(
     writeln!(file, "SPAREBANK1_CLIENT_SECRET={sparebank1_client_secret}").expect("Failed to write");
     writeln!(file, "SPAREBANK1_FIN_INST={sparebank1_fin_inst}").expect("Failed to write");
     writeln!(file, "YNAB_BUDGET_ID={ynab_budget_id}").expect("Failed to write");
-    writeln!(file, "YNAB_ACCOUNT_TOKEN={ynab_access_token}").expect("Failed to write");
+    writeln!(file, "YNAB_ACCESS_TOKEN={ynab_access_token}").expect("Failed to write");
     writeln!(file, "INITIAL_REFRESH_TOKEN={refresh_token}").expect("Failed to write");
     writeln!(file, "ACCOUNT_CONFIG_PATH={}/accounts.json", cwd.display()).expect("Failed to write");
     println!("Config file created: {}/budget.env", cwd.display());

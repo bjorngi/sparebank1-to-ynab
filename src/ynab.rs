@@ -118,9 +118,11 @@ pub async fn get_accounts(
         .get(url)
         .header("Authorization", &format!("Bearer {}", ynab_access_token))
         .send()
-        .await?
+        .await
+        .expect("Failed to get account from YNAB")
         .json::<YnabAccountsResponse>()
-        .await?;
+        .await
+        .expect("Could not parse data");
 
     let filteredAccounts = response
         .data
