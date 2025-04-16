@@ -20,6 +20,7 @@ http-body-util = "0.1"
 hyper-util = { version = "0.1", features = ["full"] }
 termion = "3.0.0"
 rand = "0.8.5"
+thiserror = "1.0.50"
 
 [[bin]]
 name = "sparebank1-to-ynab-sync"

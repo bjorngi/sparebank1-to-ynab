@@ -1,5 +1,6 @@
 mod account_config;
 mod auth_data;
+mod common;
 mod config;
 mod sparebanken1;
 mod ynab;
@@ -10,7 +11,9 @@ use std::error::Error;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let config = Config::new()?;
-    let access_token = auth_data::get_access_token(&config).await?;
+    let access_token = auth_data::get_access_token(&config)
+        .await
+        .expect("Couldt not get access_token");
 
     let account_config = account_config::read_accounts_json(&config.account_config_path)?;
     let accounts = account_config.keys().cloned().collect();

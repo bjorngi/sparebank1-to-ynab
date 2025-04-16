@@ -1,6 +1,7 @@
 mod config;
 mod sparebanken1;
 mod ynab;
+mod common;
 
 use std::collections::HashMap;
 use std::error::Error;
@@ -158,16 +159,26 @@ fn write_config_file(
 ) -> Result<(), Box<dyn Error>> {
     let cwd = env::current_dir()?;
     let mut file = File::create("budget.env")?;
-
+    
+    // Default refresh token path
+    let refresh_token_path = "refresh_token.txt";
+    
     // Write environment variables to the file
-    writeln!(file, "SPAREBANK1_CLIENT_ID={sparebank1_client_id}").expect("Failed to write");
-    writeln!(file, "SPAREBANK1_CLIENT_SECRET={sparebank1_client_secret}").expect("Failed to write");
-    writeln!(file, "SPAREBANK1_FIN_INST={sparebank1_fin_inst}").expect("Failed to write");
-    writeln!(file, "YNAB_BUDGET_ID={ynab_budget_id}").expect("Failed to write");
-    writeln!(file, "YNAB_ACCESS_TOKEN={ynab_access_token}").expect("Failed to write");
-    writeln!(file, "INITIAL_REFRESH_TOKEN={refresh_token}").expect("Failed to write");
-    writeln!(file, "ACCOUNT_CONFIG_PATH={}/accounts.json", cwd.display()).expect("Failed to write");
+    writeln!(file, "SPAREBANK1_CLIENT_ID={sparebank1_client_id}")?;
+    writeln!(file, "SPAREBANK1_CLIENT_SECRET={sparebank1_client_secret}")?;
+    writeln!(file, "SPAREBANK1_FIN_INST={sparebank1_fin_inst}")?;
+    writeln!(file, "YNAB_BUDGET_ID={ynab_budget_id}")?;
+    writeln!(file, "YNAB_ACCESS_TOKEN={ynab_access_token}")?;
+    writeln!(file, "INITIAL_REFRESH_TOKEN={refresh_token}")?;
+    writeln!(file, "ACCOUNT_CONFIG_PATH={}/accounts.json", cwd.display())?;
+    writeln!(file, "REFRESH_TOKEN_FILE_PATH={}", refresh_token_path)?;
+    
     println!("Config file created: {}/budget.env", cwd.display());
+    
+    // Save initial refresh token to the refresh token file
+    std::fs::write(refresh_token_path, refresh_token)?;
+    println!("Initial refresh token saved to: {}", refresh_token_path);
+    
     Ok(())
 }
 
@@ -199,37 +210,46 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let selected_budget = select_budget(&ynab_budgets);
     let ynab_accounts = ynab::get_accounts(&config.ynab_access_token, &selected_budget.id).await?;
 
-    let account_config: HashMap<String, String> = sparebank1_accounts
-        .iter()
-        .enumerate()
-        .scan(HashMap::new(), |config, (_, sb_acc)| {
-            let _ = Command::new("clear").status();
-            println!(
-                "Account setup for budget:{}{}{}",
-                Fg(Red),
-                selected_budget.name,
-                Fg(Reset)
-            );
-            print_ynab_accounts(&ynab_accounts);
-            println!("{}{}{} -- link to", Fg(Red), sb_acc.name, Fg(Reset));
-            let mut input = String::new();
-            io::stdin()
-                .read_line(&mut input)
-                .expect("Failed to read line");
+    if !std::path::Path::new("accounts.json").exists() {
+        let account_config: HashMap<String, String> = sparebank1_accounts
+            .iter()
+            .enumerate()
+            .scan(HashMap::new(), |config, (_, sb_acc)| {
+                let _ = Command::new("clear").status();
+                println!(
+                    "Account setup for budget:{}{}{}",
+                    Fg(Red),
+                    selected_budget.name,
+                    Fg(Reset)
+                );
+                print_ynab_accounts(&ynab_accounts);
+                println!("{}{}{} -- link to", Fg(Red), sb_acc.name, Fg(Reset));
+                let mut input = String::new();
+                io::stdin()
+                    .read_line(&mut input)
+                    .expect("Failed to read line");
 
-            let choice: usize = input.trim().parse().expect("Must be a number");
+                let choice: usize = input.trim().parse().expect("Must be a number");
 
-            if choice > 0 {
-                let ynab_account_choice =
-                    ynab_accounts.get(choice - 1).expect("Could not get choice");
-                config.insert(sb_acc.key.clone(), ynab_account_choice.id.clone());
-                Some(config.clone())
-            } else {
-                Some(config.clone())
-            }
-        })
-        .last()
-        .unwrap_or_else(HashMap::new);
+                if choice > 0 {
+                    let ynab_account_choice =
+                        ynab_accounts.get(choice - 1).expect("Could not get choice");
+                    config.insert(sb_acc.key.clone(), ynab_account_choice.id.clone());
+                    Some(config.clone())
+                } else {
+                    Some(config.clone())
+                }
+            })
+            .last()
+            .unwrap_or_else(HashMap::new);
+
+        println!("Config output: {:#?}", account_config);
+        // Open or create the output file
+        let mut file = File::create("accounts.json")?;
+        // Serialize the vector to JSON and write it to the file
+        let json_string = serde_json::to_string_pretty(&account_config)?;
+        file.write_all(json_string.as_bytes())?;
+    }
 
     write_config_file(
         &config.sparebank1_client_id,
@@ -239,14 +259,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
         &selected_budget.id,
         &auth_response.refresh_token,
     )?;
-
-    println!("Config output: {:#?}", account_config);
-    // Open or create the output file
-    let mut file = File::create("accounts.json")?;
-
-    // Serialize the vector to JSON and write it to the file
-    let json_string = serde_json::to_string_pretty(&account_config)?;
-    file.write_all(json_string.as_bytes())?;
 
     Ok(())
 }
