@@ -1,7 +1,5 @@
-mod common;
-mod config;
-mod sparebanken1;
-mod ynab;
+use sparebank1_to_ynab::sparebanken1;
+use sparebank1_to_ynab::ynab::{Account, Budget, YnabClient};
 
 use std::collections::HashMap;
 use std::error::Error;
@@ -16,7 +14,6 @@ use std::{
 extern crate termion;
 use rand::Rng;
 use termion::color::{Fg, Red, Reset};
-use ynab::{Account, Budget, YnabClient};
 
 #[derive(Debug)]
 pub struct AuthResponse {

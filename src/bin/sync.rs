@@ -1,13 +1,9 @@
-mod account_config;
-mod auth_data;
-mod common;
-mod config;
-mod sparebanken1;
-mod ynab;
-
-use config::Config;
+use sparebank1_to_ynab::account_config;
+use sparebank1_to_ynab::auth_data;
+use sparebank1_to_ynab::config::Config;
+use sparebank1_to_ynab::sparebanken1;
+use sparebank1_to_ynab::ynab::YnabClient;
 use std::error::Error;
-use ynab::YnabClient;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {

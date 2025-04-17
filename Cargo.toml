@@ -3,8 +3,6 @@ name = "sparebank1-to-ynab"
 version = "0.3.0"
 edition = "2024"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 chrono = "0.4.33"
 chrono-tz = "0.8.5"
@@ -20,8 +18,8 @@ thiserror = "2"
 
 [[bin]]
 name = "sparebank1-to-ynab-setup"
-path = "src/setup.rs"
+path = "src/bin/setup.rs"
 
 [[bin]]
 name = "sparebank1-to-ynab-sync"
-path = "src/main.rs"
+path = "src/bin/sync.rs"
