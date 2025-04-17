@@ -1,7 +1,7 @@
+mod common;
 mod config;
 mod sparebanken1;
 mod ynab;
-mod common;
 
 use std::collections::HashMap;
 use std::error::Error;
@@ -16,6 +16,7 @@ use std::{
 extern crate termion;
 use rand::Rng;
 use termion::color::{Fg, Red, Reset};
+use ynab::{Account, Budget, YnabClient};
 
 #[derive(Debug)]
 pub struct AuthResponse {
@@ -84,14 +85,14 @@ async fn get_sparebank1_auth_response(
     Ok(auth_response)
 }
 
-fn print_ynab_accounts(accounts: &[ynab::Account]) {
+fn print_ynab_accounts(accounts: &[Account]) {
     println!("YNAB accounts:");
     for (index, account) in accounts.iter().enumerate() {
         println!("{}: {}", index + 1, account.name);
     }
 }
 
-fn select_budget(ynab_budgets: &[ynab::Budget]) -> &ynab::Budget {
+fn select_budget(ynab_budgets: &[Budget]) -> &Budget {
     if ynab_budgets.len() == 1 {
         return ynab_budgets.first().expect("Nope");
     } else {
@@ -159,10 +160,10 @@ fn write_config_file(
 ) -> Result<(), Box<dyn Error>> {
     let cwd = env::current_dir()?;
     let mut file = File::create("budget.env")?;
-    
+
     // Default refresh token path
     let refresh_token_path = "refresh_token.txt";
-    
+
     // Write environment variables to the file
     writeln!(file, "SPAREBANK1_CLIENT_ID={sparebank1_client_id}")?;
     writeln!(file, "SPAREBANK1_CLIENT_SECRET={sparebank1_client_secret}")?;
@@ -172,19 +173,19 @@ fn write_config_file(
     writeln!(file, "INITIAL_REFRESH_TOKEN={refresh_token}")?;
     writeln!(file, "ACCOUNT_CONFIG_PATH={}/accounts.json", cwd.display())?;
     writeln!(file, "REFRESH_TOKEN_FILE_PATH={}", refresh_token_path)?;
-    
+
     println!("Config file created: {}/budget.env", cwd.display());
-    
+
     // Save initial refresh token to the refresh token file
     std::fs::write(refresh_token_path, refresh_token)?;
     println!("Initial refresh token saved to: {}", refresh_token_path);
-    
+
     Ok(())
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let state = rand::thread_rng().gen_range(100_000..1_000_000);
+    let state = rand::rng().random_range(100_000..1_000_000);
     let redirect_uri = "http://localhost:9050";
     let args: Vec<String> = env::args().skip(1).collect();
     let config = Arguments::from_args(args)?;
@@ -206,9 +207,27 @@ async fn main() -> Result<(), Box<dyn Error>> {
     .await?;
 
     let sparebank1_accounts = sparebanken1::get_accounts(&auth_response.access_token).await?;
-    let ynab_budgets = ynab::get_budgets(&config.ynab_access_token).await?;
+
+    // Create YnabClient with empty account config (we'll populate it later)
+    let ynab_client = YnabClient::new(
+        HashMap::new(),
+        config.ynab_access_token.clone(),
+        "".to_string(), // Initially an empty budget ID
+    );
+
+    // Get budgets using the client
+    let ynab_budgets = ynab_client.get_budgets().await?;
     let selected_budget = select_budget(&ynab_budgets);
-    let ynab_accounts = ynab::get_accounts(&config.ynab_access_token, &selected_budget.id).await?;
+
+    // Create a client with the selected budget
+    let ynab_client_with_budget = YnabClient::new(
+        HashMap::new(),
+        config.ynab_access_token.clone(),
+        selected_budget.id.clone(),
+    );
+
+    // Get accounts using the client with the selected budget
+    let ynab_accounts = ynab_client_with_budget.get_accounts().await?;
 
     if !std::path::Path::new("accounts.json").exists() {
         let account_config: HashMap<String, String> = sparebank1_accounts

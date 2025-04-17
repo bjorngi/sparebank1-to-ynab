@@ -7,6 +7,7 @@ mod ynab;
 
 use config::Config;
 use std::error::Error;
+use ynab::YnabClient;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -19,13 +20,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let accounts = account_config.keys().cloned().collect();
 
     let transactions = sparebanken1::get_transactions(&access_token, accounts).await?;
-    let ynab_response = ynab::add_transactions(
-        &config.ynab_access_token,
-        &config.ynab_budget_id,
+    
+    // Create YnabClient instance
+    let ynab_client = YnabClient::new(
         account_config,
-        transactions,
-    )
-    .await?;
+        config.ynab_access_token.clone(),
+        config.ynab_budget_id.clone(),
+    );
+    
+    // Use YnabClient to add transactions
+    let ynab_response = ynab_client.add_transactions(transactions).await?;
 
     let now = chrono::offset::Local::now();
     println!("--- {} ---", now);
