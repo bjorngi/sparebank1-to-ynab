@@ -109,6 +109,47 @@ REFRESH_TOKEN_FILE_PATH=refresh_token.txt
 
 ## Usage
 
+
+## Command-Line Interface
+
+Both binaries provide helpful command-line interfaces with `--help`:
+
+### Sync Tool
+
+```bash
+# Show help
+./sparebank1-to-ynab-sync --help
+
+# Run sync normally
+./sparebank1-to-ynab-sync
+
+# Run in dry-run mode
+./sparebank1-to-ynab-sync --dry-run
+```
+
+### Setup Wizard
+
+```bash
+# Show help
+./sparebank1-to-ynab-setup --help
+
+# Run setup
+./sparebank1-to-ynab-setup <CLIENT_ID> <CLIENT_SECRET> <FIN_INST> <YNAB_TOKEN>
+```
+
+**Help output example:**
+```
+SpareBank1 to YNAB transaction synchronization tool
+
+Usage: sparebank1-to-ynab-sync [OPTIONS]
+
+Options:
+  -d, --dry-run  Enable dry-run mode (preview transactions without importing)
+  -h, --help     Print help
+  -V, --version  Print version
+```
+
+
 ### Manual Sync
 
 Run the sync tool manually:

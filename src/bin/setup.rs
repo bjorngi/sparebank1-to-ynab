@@ -1,3 +1,4 @@
+use clap::Parser;
 use sparebank1_to_ynab::sparebanken1;
 use sparebank1_to_ynab::ynab::{Account, Budget, YnabClient};
 
@@ -115,41 +116,23 @@ fn select_budget(ynab_budgets: &[Budget]) -> &Budget {
         return ynab_budgets.get(choice - 1).expect("Do it");
     }
 }
-
-#[derive(Debug)]
-pub struct Arguments {
+/// SpareBank1 to YNAB setup wizard
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// SpareBank1 API client ID
     sparebank1_client_id: String,
+    
+    /// SpareBank1 API client secret
     sparebank1_client_secret: String,
+    
+    /// SpareBank1 financial institution ID
     sparebank1_fin_inst: String,
+    
+    /// YNAB personal access token
     ynab_access_token: String,
 }
 
-impl Arguments {
-    // Function to create Arguments from command-line arguments
-    fn from_args(args: Vec<String>) -> Result<Self, String> {
-        // Check if the correct number of arguments is provided
-        if args.len() != 4 {
-            return Err(
-                "Usage: program_name <sparebank1_client_id> <sparebank1_client_secret> <sparebank1_fint_inst> <ynab_access_token>"
-                    .to_string(),
-            );
-        }
-
-        // Assign command-line arguments to struct fields
-        let sparebank1_client_id = args[0].clone();
-        let sparebank1_client_secret = args[1].clone();
-        let sparebank1_fin_inst = args[2].clone();
-        let ynab_access_token = args[3].clone();
-
-        // Create and return Arguments struct
-        Ok(Self {
-            sparebank1_client_id,
-            sparebank1_client_secret,
-            sparebank1_fin_inst,
-            ynab_access_token,
-        })
-    }
-}
 
 fn write_config_file(
     sparebank1_client_id: &String,
@@ -198,12 +181,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let state = rand::rng().random_range(100_000..1_000_000);
     let redirect_uri = "http://localhost:9050";
-    let args: Vec<String> = env::args().skip(1).collect();
-    let config = Arguments::from_args(args)?;
+    let args = Args::parse();
 
     let url = format!(
         "https://api-auth.sparebank1.no/oauth/authorize?client_id={}&state={}&redirect_uri={}&finInst={}&response_type=code",
-        config.sparebank1_client_id, state, redirect_uri, config.sparebank1_fin_inst
+        args.sparebank1_client_id, state, redirect_uri, args.sparebank1_fin_inst
     );
 
     // Open browser to start the OAuth flow
@@ -211,8 +193,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let _ = open::that(url);
     info!("Waiting for OAuth callback on http://localhost:9050");
     let auth_response = get_sparebank1_auth_response(
-        &config.sparebank1_client_id,
-        &config.sparebank1_client_secret,
+        &args.sparebank1_client_id,
+        &args.sparebank1_client_secret,
     )
     .await?;
 
@@ -224,7 +206,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Create YnabClient with empty account config (we'll populate it later)
     let ynab_client = YnabClient::new(
         HashMap::new(),
-        config.ynab_access_token.clone(),
+        args.ynab_access_token.clone(),
         "".to_string(), // Initially an empty budget ID
     );
 
@@ -237,7 +219,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Create a client with the selected budget
     let ynab_client_with_budget = YnabClient::new(
         HashMap::new(),
-        config.ynab_access_token.clone(),
+        args.ynab_access_token.clone(),
         selected_budget.id.clone(),
     );
 
@@ -296,10 +278,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     write_config_file(
-        &config.sparebank1_client_id,
-        &config.sparebank1_client_secret,
-        &config.sparebank1_fin_inst,
-        &config.ynab_access_token,
+        &args.sparebank1_client_id,
+        &args.sparebank1_client_secret,
+        &args.sparebank1_fin_inst,
+        &args.ynab_access_token,
         &selected_budget.id,
         &auth_response.refresh_token,
     )?;

@@ -1,12 +1,21 @@
+use clap::Parser;
 use sparebank1_to_ynab::account_config;
 use sparebank1_to_ynab::auth_data;
 use sparebank1_to_ynab::config::Config;
 use sparebank1_to_ynab::sparebanken1;
 use sparebank1_to_ynab::ynab::YnabClient;
-use std::env;
 use std::error::Error;
 use tracing::{error, info, warn};
 use tracing_subscriber;
+
+/// SpareBank1 to YNAB transaction synchronization tool
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// Enable dry-run mode (preview transactions without importing)
+    #[arg(short, long)]
+    dry_run: bool,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -20,11 +29,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     info!("Starting SpareBank1 to YNAB sync");
 
+    let args = Args::parse();
     let config = Config::new()?;
 
-    // Check for dry-run flag (CLI flag overrides config)
-    let args: Vec<String> = env::args().collect();
-    let dry_run = args.contains(&"--dry-run".to_string()) || config.dry_run;
+    // CLI flag takes precedence over config
+    let dry_run = args.dry_run || config.dry_run;
 
     if dry_run {
         warn!("DRY-RUN MODE: No transactions will be sent to YNAB");
