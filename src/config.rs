@@ -26,6 +26,7 @@ pub struct Config {
     pub account_config_path: String,
     pub refresh_token_file_path: String,
     pub initial_refresh_token: String,
+    pub dry_run: bool,
 }
 
 impl Config {
@@ -53,6 +54,7 @@ impl Config {
                 "refresh_token.txt",
             )?,
             initial_refresh_token: Self::get_env_or_error("INITIAL_REFRESH_TOKEN")?,
+            dry_run: Self::get_env_bool("DRY_RUN"),
         };
 
         // Validate the configuration
@@ -86,6 +88,7 @@ impl Config {
             refresh_token_file_path: refresh_token_file_path
                 .unwrap_or_else(|| "refresh_token.txt".to_string()),
             initial_refresh_token,
+            dry_run: false,
         };
 
         // Validate the configuration
@@ -105,6 +108,17 @@ impl Config {
             Ok(val) => Ok(val),
             Err(std::env::VarError::NotPresent) => Ok(default.to_string()),
             Err(e) => Err(ConfigError::EnvVarError(e)),
+        }
+    }
+
+    /// Get a boolean environment variable (true if set to "1", "true", "yes", case-insensitive)
+    fn get_env_bool(name: &str) -> bool {
+        match env::var(name) {
+            Ok(val) => {
+                let val_lower = val.to_lowercase();
+                val_lower == "1" || val_lower == "true" || val_lower == "yes"
+            }
+            Err(_) => false,
         }
     }
 

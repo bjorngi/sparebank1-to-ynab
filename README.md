@@ -18,6 +18,8 @@ The sync tool is designed to run periodically (e.g., via cron or as a scheduled 
 - 🎯 Maps SpareBank 1 accounts to YNAB accounts
 - 🔍 Duplicate detection to prevent re-importing transactions
 - 🐳 Docker support for easy deployment
+- 🧪 Dry-run mode to preview transactions without importing
+- 📝 Structured logging with configurable log levels
 - 📦 GitHub Container Registry releases
 
 ## Prerequisites
@@ -121,6 +123,62 @@ The tool will:
 3. Fetch recent transactions from configured accounts
 4. Import transactions to YNAB with duplicate detection
 5. Display a summary of imported and duplicate transactions
+
+
+### Dry-Run Mode
+
+Test the sync without actually importing transactions to YNAB. This is useful for:
+- Verifying your setup is working
+- Previewing which transactions would be imported
+- Testing after configuration changes
+
+**Using the command-line flag:**
+
+```bash
+./sparebank1-to-ynab-sync --dry-run
+```
+
+**Using environment variable:**
+
+```bash
+DRY_RUN=true ./sparebank1-to-ynab-sync
+```
+
+**In your budget.env file:**
+
+```env
+DRY_RUN=true
+```
+
+**With Docker:**
+
+```bash
+docker run --rm \
+  -e DRY_RUN=true \
+  -v $(pwd)/budget.env:/app/.env \
+  -v $(pwd)/accounts.json:/app/accounts.json \
+  -v $(pwd)/refresh_token.txt:/app/refresh_token.txt \
+  ghcr.io/bjorngi/sparebank1-to-ynab/sparebank1-to-ynab-sync:latest
+```
+
+**Example output:**
+
+```
+2024-01-15T10:30:00.123Z  WARN sparebank1_to_ynab::sync: DRY-RUN MODE: No transactions will be sent to YNAB
+2024-01-15T10:30:00.456Z  INFO sparebank1_to_ynab::sync: Starting SpareBank1 to YNAB sync
+...
+2024-01-15T10:30:02.123Z  INFO sparebank1_to_ynab::sync: DRY-RUN: Would import 5 transactions to YNAB
+2024-01-15T10:30:02.124Z  INFO sparebank1_to_ynab::sync:   [1] 2024-01-14 | REMA 1000 | -127.50 NOK | Groceries
+2024-01-15T10:30:02.125Z  INFO sparebank1_to_ynab::sync:   [2] 2024-01-14 | CIRCLE K | -450.00 NOK | Fuel
+2024-01-15T10:30:02.126Z  INFO sparebank1_to_ynab::sync:   [3] 2024-01-13 | Salary | 35000.00 NOK | Monthly salary
+2024-01-15T10:30:02.127Z  INFO sparebank1_to_ynab::sync:   [4] 2024-01-13 | Netflix | -119.00 NOK | Subscription
+2024-01-15T10:30:02.128Z  INFO sparebank1_to_ynab::sync:   [5] 2024-01-12 | KIWI | -234.50 NOK | Groceries
+2024-01-15T10:30:02.567Z  INFO sparebank1_to_ynab::sync: Dry-run completed at 2024-01-15 11:30:02
+2024-01-15T10:30:02.568Z  WARN sparebank1_to_ynab::sync: DRY-RUN MODE: No transactions were actually sent to YNAB
+```
+
+**Note:** The `--dry-run` command-line flag takes precedence over the `DRY_RUN` environment variable.
+
 
 ### Docker
 
