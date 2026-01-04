@@ -1,6 +1,7 @@
 use crate::config::{Config, ConfigError};
 use serde::Deserialize;
 use std::fs;
+use tracing::{debug, info, warn};
 
 #[derive(Debug, Deserialize)]
 pub struct Sparebanken1AuthDataResponse {
@@ -10,8 +11,17 @@ pub struct Sparebanken1AuthDataResponse {
 
 fn get_refresh_token(config: &Config) -> Result<String, ConfigError> {
     match fs::read_to_string(&config.refresh_token_file_path) {
-        Ok(refresh_token) => Ok(refresh_token),
-        Err(_) => Ok(config.initial_refresh_token.clone()),
+        Ok(refresh_token) => {
+            debug!(
+                "Loaded refresh token from file: {}",
+                config.refresh_token_file_path
+            );
+            Ok(refresh_token)
+        }
+        Err(_) => {
+            warn!("Could not read refresh token file, using initial refresh token");
+            Ok(config.initial_refresh_token.clone())
+        }
     }
 }
 
@@ -19,6 +29,7 @@ fn save_refresh_token(
     refresh_token_file_path: &str,
     new_refresh_token: String,
 ) -> Result<(), std::io::Error> {
+    debug!("Saving new refresh token to: {}", refresh_token_file_path);
     fs::write(refresh_token_file_path, new_refresh_token)
 }
 
@@ -26,6 +37,7 @@ async fn refresh_access_token(
     config: &Config,
     refresh_token: String,
 ) -> Result<String, Box<dyn std::error::Error>> {
+    debug!("Refreshing access token using refresh token");
     let client = reqwest::Client::new();
     let url: &str = "https://api-auth.sparebank1.no/oauth/token";
 
@@ -44,11 +56,13 @@ async fn refresh_access_token(
         .await?;
 
     let _ = save_refresh_token(&config.refresh_token_file_path, response.refresh_token);
+    info!("Successfully refreshed access token");
 
     Ok(response.access_token)
 }
 
 pub async fn get_access_token(config: &Config) -> Result<String, Box<dyn std::error::Error>> {
+    debug!("Getting access token");
     let refresh_token = get_refresh_token(config)?;
     let access_token = refresh_access_token(config, refresh_token);
     return Ok(access_token.await?);

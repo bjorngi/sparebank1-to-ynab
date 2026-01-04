@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use std::error::Error;
+use tracing::{debug, error, info};
 
 const BASE_API_URL: &str = "https://api.sparebank1.no/personal/banking";
 
@@ -89,6 +90,7 @@ impl Sparebanken1Client {
         client_secret: &str,
         refresh_token: &str,
     ) -> Result<(String, String), Box<dyn Error>> {
+        debug!("Refreshing SpareBank1 access token");
         let client = reqwest::Client::new();
         let url = "https://api-auth.sparebank1.no/oauth/token";
 
@@ -106,6 +108,7 @@ impl Sparebanken1Client {
             .json::<AuthResponse>()
             .await?;
 
+        info!("Successfully refreshed SpareBank1 access token");
         // Return both the access token and refresh token
         Ok((response.access_token, response.refresh_token))
     }
@@ -129,6 +132,7 @@ impl Sparebanken1Client {
         &self,
         accounts: Vec<String>,
     ) -> Result<Vec<Transaction>, reqwest::Error> {
+        debug!("Fetching transactions for {} accounts", accounts.len());
         let url = format!("{}/transactions", BASE_API_URL);
         let params: Vec<(&str, &str)> = accounts
             .iter()
@@ -145,7 +149,7 @@ impl Sparebanken1Client {
             .await?
             .error_for_status()
             .map_err(|e| {
-                eprintln!("Request error: {}", e);
+                error!("Failed to fetch transactions from SpareBank1: {}", e);
                 e
             })?
             .json::<TransactionsResponse>()
@@ -157,11 +161,13 @@ impl Sparebanken1Client {
             .map(|txn| self.parse_transaction(txn))
             .collect();
 
+        info!("Successfully fetched {} transactions", transactions.len());
         Ok(transactions)
     }
 
     /// Get accounts for the authenticated user
     pub async fn get_accounts(&self) -> Result<Vec<Account>, reqwest::Error> {
+        debug!("Fetching accounts from SpareBank1");
         let url = format!("{}/accounts?includeCreditCardAccounts=true", BASE_API_URL);
 
         let accounts_response = reqwest::Client::new()
@@ -172,7 +178,7 @@ impl Sparebanken1Client {
             .await?
             .error_for_status()
             .map_err(|e| {
-                eprintln!("Request error: {}", e);
+                error!("Failed to fetch accounts from SpareBank1: {}", e);
                 e
             })?
             .text()
@@ -181,6 +187,10 @@ impl Sparebanken1Client {
         let accounts_json: AccountsResponse =
             serde_json::from_str(&accounts_response).expect("Failed to parse accounts response");
 
+        info!(
+            "Successfully fetched {} accounts",
+            accounts_json.accounts.len()
+        );
         Ok(accounts_json.accounts)
     }
 }

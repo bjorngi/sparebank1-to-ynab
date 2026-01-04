@@ -7,13 +7,15 @@ use std::fs::File;
 use std::process::Command;
 use std::{env, io};
 use std::{
-    io::{prelude::*, BufReader},
+    io::{BufReader, prelude::*},
     net::{SocketAddr, TcpListener, TcpStream},
 };
 
 extern crate termion;
 use rand::Rng;
 use termion::color::{Fg, Red, Reset};
+use tracing::{debug, info};
+use tracing_subscriber;
 
 #[derive(Debug)]
 pub struct AuthResponse {
@@ -28,7 +30,9 @@ async fn get_access_token(
     client_secret: &String,
 ) -> Result<AuthResponse, Box<dyn Error>> {
     let redirect_uri = "http://localhost:9050";
-    let url = format!("https://api-auth.sparebank1.no/oauth/token?client_id={client_id}&client_secret={client_secret}&redirect_uri={redirect_uri}&grant_type=authorization_code&code={code}&state={state}");
+    let url = format!(
+        "https://api-auth.sparebank1.no/oauth/token?client_id={client_id}&client_secret={client_secret}&redirect_uri={redirect_uri}&grant_type=authorization_code&code={code}&state={state}"
+    );
 
     let response = reqwest::Client::new()
         .post(&url)
@@ -182,6 +186,16 @@ fn write_config_file(
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    // Initialize tracing subscriber for logging
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .init();
+
+    info!("Starting SpareBank1 to YNAB setup wizard");
+
     let state = rand::rng().random_range(100_000..1_000_000);
     let redirect_uri = "http://localhost:9050";
     let args: Vec<String> = env::args().skip(1).collect();
@@ -189,21 +203,23 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let url = format!(
         "https://api-auth.sparebank1.no/oauth/authorize?client_id={}&state={}&redirect_uri={}&finInst={}&response_type=code",
-        config.sparebank1_client_id,
-        state,
-        redirect_uri,
-        config.sparebank1_fin_inst
+        config.sparebank1_client_id, state, redirect_uri, config.sparebank1_fin_inst
     );
 
     // Open browser to start the OAuth flow
+    info!("Opening browser for OAuth authentication");
     let _ = open::that(url);
+    info!("Waiting for OAuth callback on http://localhost:9050");
     let auth_response = get_sparebank1_auth_response(
         &config.sparebank1_client_id,
         &config.sparebank1_client_secret,
     )
     .await?;
 
+    info!("Successfully authenticated with SpareBank1");
+    debug!("Fetching SpareBank1 accounts");
     let sparebank1_accounts = sparebanken1::get_accounts(&auth_response.access_token).await?;
+    info!("Found {} SpareBank1 accounts", sparebank1_accounts.len());
 
     // Create YnabClient with empty account config (we'll populate it later)
     let ynab_client = YnabClient::new(
@@ -213,7 +229,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     );
 
     // Get budgets using the client
+    debug!("Fetching YNAB budgets");
     let ynab_budgets = ynab_client.get_budgets().await?;
+    info!("Found {} YNAB budgets", ynab_budgets.len());
     let selected_budget = select_budget(&ynab_budgets);
 
     // Create a client with the selected budget
@@ -224,9 +242,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
     );
 
     // Get accounts using the client with the selected budget
+    info!("Fetching accounts for budget: {}", selected_budget.name);
     let ynab_accounts = ynab_client_with_budget.get_accounts().await?;
+    info!("Found {} YNAB accounts in budget", ynab_accounts.len());
 
     if !std::path::Path::new("accounts.json").exists() {
+        info!("Creating account mapping configuration");
         let account_config: HashMap<String, String> = sparebank1_accounts
             .iter()
             .enumerate()
@@ -259,12 +280,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .last()
             .unwrap_or_else(HashMap::new);
 
-        println!("Config output: {:#?}", account_config);
+        info!(
+            "Account mapping configured: {} accounts mapped",
+            account_config.len()
+        );
+        debug!("Account configuration: {:#?}", account_config);
         // Open or create the output file
         let mut file = File::create("accounts.json")?;
         // Serialize the vector to JSON and write it to the file
         let json_string = serde_json::to_string_pretty(&account_config)?;
         file.write_all(json_string.as_bytes())?;
+        info!("Saved account configuration to accounts.json");
+    } else {
+        info!("Account configuration file already exists, skipping");
     }
 
     write_config_file(
@@ -275,6 +303,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         &selected_budget.id,
         &auth_response.refresh_token,
     )?;
+
+    info!("Setup completed successfully!");
+    info!("You can now run sparebank1-to-ynab-sync to synchronize transactions");
 
     Ok(())
 }

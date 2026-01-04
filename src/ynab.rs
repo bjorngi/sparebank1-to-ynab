@@ -2,6 +2,7 @@ use crate::sparebanken1;
 use chrono_tz::Europe::Oslo;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use tracing::{debug, error, info};
 
 const BASE_API_URL: &str = "https://api.ynab.com/v1";
 
@@ -121,6 +122,10 @@ impl YnabClient {
         &self,
         transactions: Vec<sparebanken1::Transaction>,
     ) -> Result<CreateYnabTransactionResponseData, reqwest::Error> {
+        debug!(
+            "Preparing to add {} transactions to YNAB",
+            transactions.len()
+        );
         let url = format!("{}/budgets/{}/transactions", BASE_API_URL, self.ynab_budget);
         let ynab_transactions = self.parse_transactions(&transactions);
 
@@ -134,14 +139,32 @@ impl YnabClient {
             .header("Authorization", &format!("Bearer {}", self.ynab_token))
             .json(&data)
             .send()
-            .await?
+            .await
+            .map_err(|e| {
+                error!("Failed to send transactions to YNAB: {}", e);
+                e
+            })?
             .json::<CreateYnabTransactionResponse>()
-            .await?;
+            .await
+            .map_err(|e| {
+                error!("Failed to parse YNAB response: {}", e);
+                e
+            })?;
+
+        info!(
+            "Successfully added {} transactions to YNAB",
+            response.data.transaction_ids.len()
+        );
+        debug!(
+            "Skipped {} duplicate transactions",
+            response.data.duplicate_import_ids.len()
+        );
 
         Ok(response.data)
     }
 
     pub async fn get_accounts(&self) -> Result<Vec<Account>, reqwest::Error> {
+        debug!("Fetching accounts from YNAB");
         let url = format!("{BASE_API_URL}/budgets/{}/accounts", self.ynab_budget);
 
         let response = reqwest::Client::new()
@@ -154,7 +177,7 @@ impl YnabClient {
             .await
             .expect("Could not parse data");
 
-        let filtered_accounts = response
+        let filtered_accounts: Vec<Account> = response
             .data
             .accounts
             .iter()
@@ -162,10 +185,16 @@ impl YnabClient {
             .cloned()
             .collect();
 
+        info!(
+            "Successfully fetched {} open accounts from YNAB",
+            filtered_accounts.len()
+        );
+
         Ok(filtered_accounts)
     }
 
     pub async fn get_budgets(&self) -> Result<Vec<Budget>, reqwest::Error> {
+        debug!("Fetching budgets from YNAB");
         let url = format!("{BASE_API_URL}/budgets/");
         let response = reqwest::Client::new()
             .get(url)
@@ -174,6 +203,11 @@ impl YnabClient {
             .await?
             .json::<YnabBudgetsDataResponse>()
             .await?;
+
+        info!(
+            "Successfully fetched {} budgets from YNAB",
+            response.data.budgets.len()
+        );
 
         Ok(response.data.budgets)
     }

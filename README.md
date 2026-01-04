@@ -161,6 +161,55 @@ Add to your crontab to run every hour:
 - The sync tool automatically refreshes tokens using the refresh token
 - New refresh tokens are saved to `refresh_token.txt` after each refresh
 
+
+### Logging
+
+The application uses structured logging with configurable log levels. By default, logs at `info` level and above are displayed.
+
+**Control log level with the `RUST_LOG` environment variable:**
+
+```bash
+# Show all logs (including debug messages)
+RUST_LOG=debug ./sparebank1-to-ynab-sync
+
+# Show only warnings and errors
+RUST_LOG=warn ./sparebank1-to-ynab-sync
+
+# Show specific module logs
+RUST_LOG=sparebank1_to_ynab::ynab=debug ./sparebank1-to-ynab-sync
+
+# Default (info level)
+./sparebank1-to-ynab-sync
+```
+
+**Log levels:**
+- `error` - Critical errors only
+- `warn` - Warnings and errors
+- `info` - General information, warnings, and errors (default)
+- `debug` - Detailed debugging information
+- `trace` - Very verbose trace-level logging
+
+**Example output:**
+```
+2024-01-15T10:30:00.123Z  INFO sparebank1_to_ynab::sync: Starting SpareBank1 to YNAB sync
+2024-01-15T10:30:00.456Z  INFO sparebank1_to_ynab::config: Configuration loaded successfully
+2024-01-15T10:30:00.789Z  INFO sparebank1_to_ynab::auth_data: Successfully refreshed access token
+2024-01-15T10:30:01.234Z  INFO sparebank1_to_ynab::sparebanken1: Successfully fetched 25 transactions
+2024-01-15T10:30:02.567Z  INFO sparebank1_to_ynab::ynab: Successfully added 20 transactions to YNAB
+2024-01-15T10:30:02.568Z  INFO sparebank1_to_ynab::sync: Added 20 new transactions
+2024-01-15T10:30:02.568Z  INFO sparebank1_to_ynab::sync: Skipped 5 duplicate transactions
+```
+
+**With Docker:**
+```bash
+docker run --rm \
+  -e RUST_LOG=debug \
+  -v $(pwd)/budget.env:/app/.env \
+  -v $(pwd)/accounts.json:/app/accounts.json \
+  -v $(pwd)/refresh_token.txt:/app/refresh_token.txt \
+  ghcr.io/bjorngi/sparebank1-to-ynab/sparebank1-to-ynab-sync:latest
+```
+
 ## Development
 
 ### Build
