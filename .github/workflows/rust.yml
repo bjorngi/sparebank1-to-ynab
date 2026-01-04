@@ -5,36 +5,121 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2 # Need previous commit to compare versions
 
-      - name: Read version from Cargo.toml
-        id: read-version
-        run: echo "::set-output name=version::$(grep -oP 'version = "\K[^"]+' Cargo.toml | head -n 1)"
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: x86_64-unknown-linux-gnu
 
-      - name: Build
+      - name: Read current version
+        id: version
+        run: |
+          VERSION=$(grep -oP 'version = "\K[^"]+' Cargo.toml | head -n 1)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $VERSION"
+
+      - name: Check if version changed
+        id: version-check
+        run: |
+          PREV_VERSION=$(git show HEAD~1:Cargo.toml 2>/dev/null | grep -oP 'version = "\K[^"]+' | head -n 1 || echo "none")
+          CURR_VERSION="${{ steps.version.outputs.version }}"
+
+          if [ "$PREV_VERSION" != "$CURR_VERSION" ]; then
+            echo "Version changed: $PREV_VERSION -> $CURR_VERSION"
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "Version unchanged: $CURR_VERSION"
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build sync binary
         run: RUSTFLAGS='-C target-feature=+crt-static' cargo build --release --target x86_64-unknown-linux-gnu --bin sparebank1-to-ynab-sync
 
-      - name: Log in to GitHub Docker Registry
+      - name: Build setup binary
+        if: steps.version-check.outputs.changed == 'true'
+        run: RUSTFLAGS='-C target-feature=+crt-static' cargo build --release --target x86_64-unknown-linux-gnu --bin sparebank1-to-ynab-setup
+
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build container image
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           push: true
           context: .
           build-args: |
-            build_VERSION=${{ steps.read-version.outputs.version }}
-          tags: ghcr.io/bjorngi/sparebank1-to-ynab/sparebank1-to-ynab-sync:latest,ghcr.io/bjorngi/sparebank1-to-ynab/sparebank1-to-ynab-sync:${{ steps.read-version.outputs.version }},
+            build_VERSION=${{ steps.version.outputs.version }}
+          tags: |
+            ghcr.io/bjorngi/sparebank1-to-ynab/sparebank1-to-ynab-sync:latest
+            ghcr.io/bjorngi/sparebank1-to-ynab/sparebank1-to-ynab-sync:${{ steps.version.outputs.version }}
+            ghcr.io/bjorngi/sparebank1-to-ynab/sparebank1-to-ynab-sync:v${{ steps.version.outputs.version }}
+
+      - name: Create Git tag
+        if: steps.version-check.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${{ steps.version.outputs.version }}" -m "Release v${{ steps.version.outputs.version }}"
+          git push origin "v${{ steps.version.outputs.version }}"
+
+      - name: Generate release notes
+        if: steps.version-check.outputs.changed == 'true'
+        id: release-notes
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+
+          if [ -z "$PREV_TAG" ]; then
+            # First release, get all commits
+            NOTES=$(git log --pretty=format:"- %s (%h)" --reverse)
+          else
+            # Get commits since last tag
+            NOTES=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --reverse)
+          fi
+
+          echo "RELEASE_NOTES<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        if: steps.version-check.outputs.changed == 'true'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Release v${{ steps.version.outputs.version }}
+          body: |
+            ## Changes
+
+            ${{ steps.release-notes.outputs.RELEASE_NOTES }}
+
+            ## Docker Images
+
+            ```bash
+            docker pull ghcr.io/bjorngi/sparebank1-to-ynab/sparebank1-to-ynab-sync:${{ steps.version.outputs.version }}
+            ```
+
+            ## Installation
+
+            Download the binaries below or see [README](https://github.com/bjorngi/sparebank1-to-ynab/blob/main/README.md) for installation instructions.
+          draft: false
+          prerelease: false
+          files: |
+            ./target/x86_64-unknown-linux-gnu/release/sparebank1-to-ynab-sync
+            ./target/x86_64-unknown-linux-gnu/release/sparebank1-to-ynab-setup
+          token: ${{ secrets.GITHUB_TOKEN }}
