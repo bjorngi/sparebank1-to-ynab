@@ -317,11 +317,50 @@ docker run --rm \
 cargo build
 ```
 
+
 ### Run Tests
+
+The project includes comprehensive unit tests for critical functionality:
 
 ```bash
 cargo test
 ```
+
+**Test coverage includes:**
+
+- **YNAB Transaction Transformation** (`ynab_tests.rs`)
+  - Amount conversion to milliunits
+  - Date conversion to Oslo timezone
+  - Import ID generation and format
+  - Duplicate detection logic
+  - Account mapping
+  - Edge cases (empty fields, large/small amounts, negative zero)
+
+- **Configuration Validation** (`config_tests.rs`)
+  - Config creation with valid values
+  - Validation of required fields
+  - Empty/whitespace-only field rejection
+  - Default vs custom refresh token paths
+
+- **Account Configuration** (`account_config_tests.rs`)
+  - Reading valid JSON files
+  - Handling empty configurations
+  - Invalid JSON/file errors
+  - Special characters and Unicode support
+  - Wrong structure detection
+
+**Run specific test file:**
+```bash
+cargo test ynab_tests
+cargo test config_tests
+cargo test account_config_tests
+```
+
+**Run with output:**
+```bash
+cargo test -- --nocapture
+```
+
 
 ### Run Locally
 
